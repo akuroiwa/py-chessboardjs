@@ -1,0 +1,2 @@
+graft py_chessboardjs
+global-exclude *.py[cod]
