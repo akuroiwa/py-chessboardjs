@@ -5,7 +5,7 @@ Chess GUI using pywebview and chessboard.js.
 This is a part of [Chess-Ant](https://github.com/akuroiwa/chess-ant) project.
 That manual will be updated soon.
 
-Chess-Ant is currently too slow to function as a chess engine. It is possible to experiment by loading pgn and having it solve the problem.
+Chess-Ant is currently too slow to function as a chess engine.  To make matters worse, there is a glitch in the call to chess-ant.  It is possible to experiment by loading pgn and having it solve the problem.
 
 
 ## Installation

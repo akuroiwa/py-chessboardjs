@@ -224,7 +224,7 @@ function changeBoardWidth() {
 }
 
 function openPgnDialog() {
-    document.getElementsByName('startFen')[0].value = ''; // ユーザーの入力もクリア
+    document.getElementsByName('startFen')[0].value = ''; // Clears user input
     pywebview.api.open_pgn_dialog().then(function(fen) {
     if (fen) {
         console.log("FEN String: " + fen);
