@@ -5,13 +5,13 @@ from setuptools import setup, find_packages
 
 setup(
     name='py_chessboardjs',
-    version='0.0.1',
+    version='0.0.2',
     url='https://github.com/akuroiwa/py-chessboardjs',
     # # PyPI url
     # download_url='',
     license='GNU/GPLv3+',
-    author='Akihiro Kuroiwa',
-    author_email='akuroiwa@env-reform.com',
+    author='Akihiro Kuroiwa, ChatGPT of OpenAI',
+    author_email='akuroiwa@env-reform.com, ',
     description='Chess GUI using pywebview and chessboard.js.',
     # long_description="\n%s" % open('README.md').read(),
     long_description=open("README.md", "r").read(),

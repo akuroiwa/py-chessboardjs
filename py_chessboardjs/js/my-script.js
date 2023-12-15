@@ -111,7 +111,37 @@ function onDrop(source, target) {
     makeUserMove(source, target);
 }
 
-let isCastlingInProgress = false;
+// let isCastlingInProgress = false;
+
+function handleComputerMove() {
+    if (!game.game_over()) {
+        if ((game.turn() === 'w' && whiteEngineSelect.value !== 'user') ||
+            (game.turn() === 'b' && blackEngineSelect.value !== 'user')) {
+	    window.setTimeout(makeComputerMove, 250);
+
+            // if (!isCastlingInProgress) {
+            //     // Check if the move is a castling move
+            //     let history = game.history({ verbose: true });
+            //     let lastMove = history.length !== 0 ? history[history.length - 1].san : '';
+
+            //     if (lastMove === 'O-O' || lastMove === 'O-O-O') {
+            //         // Mark that castling is in progress
+            //         isCastlingInProgress = true;
+            //     } else {
+            //         // Make the computer move immediately for non-castling moves
+            //         window.setTimeout(makeComputerMove, 250);
+            //     }
+            // } else {
+            //     // Delay the computer move for castling
+            //     window.setTimeout(() => {
+            //         makeComputerMove();
+            //         // Reset the flag for castling completion
+            //         isCastlingInProgress = false;
+            //     }, 250);
+            // }
+        }
+    }
+}
 
 function onChange(oldPos, newPos) {
     console.log('Position changed:')
@@ -119,38 +149,7 @@ function onChange(oldPos, newPos) {
     console.log('New position: ' + Chessboard.objToFen(newPos))
     console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
 
-    let lastMove;
-
-    if (!game.game_over()) {
-        if ((game.turn() === 'w' && whiteEngineSelect.value !== 'user') ||
-            (game.turn() === 'b' && blackEngineSelect.value !== 'user')) {
-            if (!isCastlingInProgress) {
-                // Check if the move is a castling move
-                let history = game.history({ verbose: true });
-		if (history.length !== 0) {
-                    lastMove = history[history.length - 1].san;
-		} else {
-		    lastMove = '';
-		}
-
-                if (lastMove === 'O-O' || lastMove === 'O-O-O') {
-		    // Mark that castling is in progress
-		    isCastlingInProgress = true;
-                } else {
-		    // Make the computer move immediately for non-castling moves
-		    // makeComputerMove();
-		    window.setTimeout(makeComputerMove, 250);
-                }
-            } else {
-                // Delay the computer move for castling
-                window.setTimeout(() => {
-                    makeComputerMove();
-                    // Reset the flag for castling completion
-                    isCastlingInProgress = false;
-                }, 250);
-            }
-        }
-    }
+    handleComputerMove();
 }
 
 // update the board position after the piece snap
@@ -160,6 +159,7 @@ function onSnapEnd () {
 }
 
 $('#playBtn').on('click', function () {
+    let oldFen = game.fen();
     var startFenInput = document.getElementsByName('startFen')[0].value
     if (startFenInput) {
 	console.log(startFenInput);
@@ -184,17 +184,31 @@ $('#playBtn').on('click', function () {
     console.log(game.fen())
     console.log('board.fen()')
     console.log(board.fen())
-    board.clear();
-    board.position(game.fen())
+    let newFen = game.fen();
+    if ((oldFen === newFen) && (board.fen() !== '8/8/8/8/8/8/8/8')) {
+	handleComputerMove();
+    }
+    else {
+	// board.clear();
+	board.position(game.fen())
+    }
     // startFenInput.reset()
 })
 
 $('#resetBtn').on('click', function () {
+    let oldFen = game.fen();
     game.reset();
-    board.clear();
-    board.position(game.fen());
-    pywebview.api.reset_game_board();
-    document.getElementsByName('startFen')[0].value = ''; // Also clears user input
+    let newFen = game.fen();
+    if ((oldFen === newFen) && (board.fen() !== '8/8/8/8/8/8/8/8')) {
+	handleComputerMove();
+    }
+    else {
+	// board.clear();
+	board.position(game.fen());
+	// board.position('start');
+	document.getElementsByName('startFen')[0].value = ''; // Also clears user input
+	pywebview.api.reset_game_board();
+    }
 })
 
 var config = {
@@ -226,12 +240,18 @@ function changeBoardWidth() {
 function openPgnDialog() {
     document.getElementsByName('startFen')[0].value = ''; // Clears user input
     pywebview.api.open_pgn_dialog().then(function(fen) {
-    if (fen) {
-        console.log("FEN String: " + fen);
-	game.load(fen)
-	board.clear();
-	board.position(game.fen());
-    }});
+	if (fen) {
+            console.log("FEN String: " + fen);
+	    const oldFen = game.fen();
+	    if (oldFen === fen) {
+		handleComputerMove();
+	    }
+	    else {
+		// board.clear();
+		game.load(fen);
+		board.position(game.fen());
+	    }
+	}});
 }
 
 function savePgnDialog() {
@@ -246,8 +266,8 @@ function savePgnDialog() {
 function switchToPreviousGame() {
     pywebview.api.switch_to_previous_game().then(function (fen) {
         if (fen) {
+	    // board.clear();
             game.load(fen);
-	    board.clear();
 	    board.position(game.fen());
         }
     });
@@ -257,8 +277,8 @@ function switchToPreviousGame() {
 function switchToNextGame() {
     pywebview.api.switch_to_next_game().then(function (fen) {
         if (fen) {
+	    // board.clear();
             game.load(fen);
-	    board.clear();
 	    board.position(game.fen());
         }
     });

@@ -31,6 +31,7 @@ class Api():
 
     # def reset_game_board(self):
     def reset_game_board(self, fen=None):
+        self.on_closed()
         game = chess.pgn.Game()
         # self.board = game.board()
         if fen:
