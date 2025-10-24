@@ -52,8 +52,8 @@ coverage.xml
 cover/
 
 # Translations
-# *.mo
-# *.pot
+*.mo
+*.pot
 
 # Django stuff:
 *.log
@@ -161,3 +161,7 @@ cython_debug/
 
 # Ignore files with trailing tilde
 *~
+
+# Agent Folder Security
+.gemini/
+.specify/
