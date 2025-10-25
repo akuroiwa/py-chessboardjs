@@ -23,7 +23,6 @@ setup(
         'Intended Audience :: End Users/Desktop',
         'Intended Audience :: Science/Research',
         'Operating System :: OS Independent',
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
         'Programming Language :: Python :: 3 :: Only',
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: User Interfaces',
