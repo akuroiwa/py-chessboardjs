@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import glob
 from setuptools import setup, find_packages
 
 setup(
     name='py_chessboardjs',
-    version='0.0.2',
+    version='0.0.3',
     url='https://github.com/akuroiwa/py-chessboardjs',
     # # PyPI url
     # download_url='',
     license='GNU/GPLv3+',
-    author='Akihiro Kuroiwa, ChatGPT of OpenAI',
+    author='Akihiro Kuroiwa, ChatGPT of OpenAI, Gemini',
     author_email='akuroiwa@env-reform.com, ',
     description='Chess GUI using pywebview and chessboard.js.',
     # long_description="\n%s" % open('README.md').read(),
