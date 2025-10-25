@@ -3,6 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2025-10-24
 
 ## Active Technologies
+- Python 3.12 + `pywebview`, `python-chess`, `threading`, `asyncio` (003-fix-engine-concurrency)
 
 - Python 3.12 + `pywebview`, `python-chess`, `configparser` (001-fix-settings-load-error)
 
@@ -22,6 +23,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.12: Follow standard conventions
 
 ## Recent Changes
+- 003-fix-engine-concurrency: Added Python 3.12 + `pywebview`, `python-chess`, `threading`, `asyncio`
 
 - 001-fix-settings-load-error: Added Python 3.12 + `pywebview`, `python-chess`, `configparser`
 

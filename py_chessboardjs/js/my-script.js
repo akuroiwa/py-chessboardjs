@@ -64,10 +64,7 @@ function makeComputerMove() {
 	// var uciDepth = document.getElementById('uciDepth').value
 
 	// pywebview.api.uci_engine_move(fen).then(function(move_str) {
-	pywebview.api.uci_engine_move().then(function(move_str) {
-            game.move(move_str);
-            board.position(game.fen());
-	});
+	pywebview.api.uci_engine_move();
 	break;
     default:
 	makeRandomMove();
@@ -331,6 +328,11 @@ async function selectUciEnginePath() {
         console.error('Error selecting UCI engine path:', e);
         alert('Error selecting UCI engine path: ' + e.message);
     }
+}
+
+function receiveEngineMove(san) {
+    game.move(san);
+    board.position(game.fen());
 }
 
 // --- End Example JS ----------------------------------------------------------

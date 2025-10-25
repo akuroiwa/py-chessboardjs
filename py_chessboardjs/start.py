@@ -6,21 +6,78 @@ from chess_ant import chess_ant
 import chess
 import chess.engine
 import chess.pgn
-# import json
+import json
 import configparser
 from pathlib import Path
 from collections import deque
 import concurrent.futures
 import argparse
+import threading
+import asyncio
+import queue
 
 """
 Chess GUI using pywebview and chessboard.js.
 """
 
 
+class EngineWorker(threading.Thread):
+    def __init__(self, api_callback):
+        super().__init__()
+        self.daemon = True
+        self.tasks = queue.Queue()
+        self.api_callback = api_callback
+        self.loop = None
+        self.engine = None
+
+    def run(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_until_complete(self.main())
+        self.loop.close()
+
+    async def main(self):
+        while True:
+            task, data = self.tasks.get()
+            if task == 'play':
+                await self.play_move(data)
+            elif task == 'quit':
+                break
+        await self.shutdown_engine()
+
+    async def play_move(self, data):
+        board = data['board']
+        limit = data['limit']
+        if not self.engine:
+            await self.init_engine(data['uci_path'])
+        
+        if self.engine:
+            try:
+                result = await self.engine.play(board, limit)
+                self.api_callback(board.fen(), result.move)
+            except Exception as e:
+                print(f"Engine error: {e}")
+
+    async def init_engine(self, uci_path):
+        try:
+            _, self.engine = await chess.engine.popen_uci(uci_path)
+        except Exception as e:
+            print(f"Failed to init engine: {e}")
+
+    async def shutdown_engine(self):
+        if self.engine:
+            await self.engine.quit()
+            self.engine = None
+
+    def submit_task(self, task, data=None):
+        self.tasks.put((task, data))
+
+
 class Api():
     def __init__(self):
-        self.engine = None
+        self.window = None
+        self.engine_worker = EngineWorker(self._engine_move_callback)
+        self.engine_worker.start()
         self.load_settings()  # Load configuration when creating instance
         # self.pgn will hold a file path (string) or None; do NOT keep open file objects here
         self.pgn = None
@@ -30,9 +87,20 @@ class Api():
         self.games = []
         self.current_game_index = 0
 
+    def _engine_move_callback(self, original_fen, move):
+        if move is not None:
+            # Check if the board state has changed since the engine started thinking
+            if self.board.fen() != original_fen:
+                print("Engine move discarded: Board state changed.")
+                return
+
+            san = self.board.san(move)
+            self.board.push(move)
+            if self.window:
+                self.window.evaluate_js(f'receiveEngineMove("{san}");')
+
     # def reset_game_board(self):
     def reset_game_board(self, fen=None):
-        self.on_closed()
         game = chess.pgn.Game()
         # self.board = game.board()
         if fen:
@@ -43,7 +111,14 @@ class Api():
         self.stack = self.board.move_stack
 
     def update_game_board(self, san):
-        self.board.push_san(san)
+        try:
+            self.board.push_san(san)
+            return self.board.fen()
+        except chess.IllegalMoveError as e:
+            error_message = f"Illegal move: {san}\n{e}"
+            # Use json.dumps to safely escape the error message for JavaScript
+            self.window.evaluate_js(f'alert({json.dumps(error_message)});')
+            return None
 
     # def chess_ant_move(self, fen):
     def chess_ant_move(self):
@@ -62,44 +137,25 @@ class Api():
 
     # def uci_engine_move(self, fen):
     def uci_engine_move(self):
-        fen = self.board.fen()
-        print(fen)
-        board = chess.Board(fen)
-
         if not self.uci_engine or not os.path.exists(self.uci_engine) or not os.access(self.uci_engine, os.X_OK):
             error_message = f"UCI engine path is invalid or not executable: {self.uci_engine}. Please register a valid engine."
             print(error_message)
             self.window.evaluate_js(f'alert("{error_message}");')
-            return None
+            return
 
-        if not self.engine:
-            # self.uci_engine is a string path (see load_settings / register_uci_engine)
-            self.engine = chess.engine.SimpleEngine.popen_uci(self.uci_engine)
-        try:
-            result = self.engine.play(board, chess.engine.Limit(self.depth))
-            san = board.san(result.move)
-            print(san)
-            # self.board.push_san(san)
-            self.board.push(result.move)
-            return san
-        except concurrent.futures.CancelledError:
-            # Processing when CanceledError occurs
-            self.on_closed()
-            print("concurrent.futures.CancelledError caused.  Quit UCI engine.")
-        # finally:
-        #     self.engine.quit()  # Make sure to shut down the engine
-
-        # return san
+        task_data = {
+            'board': self.board.copy(),
+            'limit': chess.engine.Limit(self.depth),
+            'uci_path': self.uci_engine
+        }
+        self.engine_worker.submit_task('play', task_data)
 
     def on_closed(self):
-        if self.engine:
-            self.engine.quit()
-            print("Quit UCI engine.")
-        self.engine = None
-        # chess_ant.ant.exit()
+        if self.engine_worker:
+            self.engine_worker.submit_task('quit')
+            self.engine_worker.join()
 
     def open_pgn_dialog(self):
-        self.on_closed()
         file_types = ('PGN File (*.pgn)', 'All files (*.*)')
         result = self.window.create_file_dialog(webview.FileDialog.OPEN, file_types=file_types)
         # create_file_dialog may return None (if cancelled) or an empty list; guard it
@@ -131,7 +187,6 @@ class Api():
             return None
 
     def save_pgn_dialog(self):
-        self.on_closed()
         file_types = ('PGN File (*.pgn)', 'All files (*.*)')
         result = self.window.create_file_dialog(webview.FileDialog.SAVE, file_types=file_types)
         if not result:
@@ -200,24 +255,20 @@ class Api():
         return None
 
     def switch_to_previous_game(self):
-        self.on_closed()
         if self.current_game_index > 0:
             self.current_game_index -= 1
         return self.load_current_game_fen()
 
     def switch_to_next_game(self):
-        self.on_closed()
         if self.current_game_index < len(self.games) - 1:
             self.current_game_index += 1
         return self.load_current_game_fen()
 
     def backward_icon(self):
-        self.on_closed()
         self.board.pop()
         return self.board.fen()
 
     def forward_icon(self):
-        self.on_closed()
         move = self.stack[len(self.board.move_stack)]
         self.board.push(move)
         return self.board.fen()
