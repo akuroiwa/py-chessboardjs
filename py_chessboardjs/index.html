@@ -63,7 +63,11 @@
 		<form id="uciEngineSettingsForm" class="px-4 py-3">
 		  <div class="mb-3">
 		    <label for="uci_engine">Path</label>
-		    <input type="file" name="uci_engine" class="form-control" onchange="saveSettings(this)">
+		    <div class="input-group">
+		      <input type="text" id="uciEnginePathDisplay" class="form-control" readonly value="Not selected">
+		      <button class="btn btn-outline-secondary" type="button" onclick="selectUciEnginePath()">Browse</button>
+		    </div>
+		    <input type="hidden" name="uci_engine" id="uciEnginePathHidden">
 		  </div>
 		  <div class="mb-3">
 		    <label for="depth">Depth</label>

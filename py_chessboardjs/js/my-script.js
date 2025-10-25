@@ -314,27 +314,23 @@ $('#forwardIcon').on('click', function () {
     });
 });
 
-function registerUciEngine() {
-    const filePath = pywebview.api.register_uci_engine();
-    if (filePath) {
-        // Added processing when a file is selected
-	return filePath
+async function selectUciEnginePath() {
+    try {
+        const path = await pywebview.api.register_uci_engine(); // Call Python API
+        const filePathDisplay = document.getElementById('uciEnginePathDisplay');
+        const filePathHidden = document.getElementById('uciEnginePathHidden');
+        if (path) {
+            filePathDisplay.value = path; // Update visible text field
+            filePathHidden.value = path; // Update hidden input value
+            // No need to call saveSettings here, as register_uci_engine already saves it
+        } else {
+            filePathDisplay.value = 'Not selected';
+            filePathHidden.value = '';
+        }
+    } catch (e) {
+        console.error('Error selecting UCI engine path:', e);
+        alert('Error selecting UCI engine path: ' + e.message);
     }
-    else {
-	return '/usr/games/stockfish'
-    }
-}
-
-function saveSettings(inputElement) {
-    const name = inputElement.name;
-    const value = inputElement.value;
-    const settings = {};
-
-    // Create settings to pass to Python side
-    settings[name] = value;
-
-    // Call a method to save settings on the Python side
-    pywebview.api.save_settings(settings);
 }
 
 // --- End Example JS ----------------------------------------------------------

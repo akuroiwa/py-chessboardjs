@@ -22,6 +22,7 @@ class Api():
     def __init__(self):
         self.engine = None
         self.load_settings()  # Load configuration when creating instance
+        # self.pgn will hold a file path (string) or None; do NOT keep open file objects here
         self.pgn = None
         self.fen = None
         self.stack = []
@@ -53,11 +54,6 @@ class Api():
         # pop, hof, stats, move, uci = chess_ant.main(fen=fen, population=self.population, generation=self.generation)
         result_dict = chess_ant.main(fen=fen, population=self.population, generation=self.generation)
 
-        # san = board.san(move)
-        # print(san)
-        # self.board.push(move)
-        # return san
-
         best_move = result_dict["best_move"]
         san = board.san(best_move)
         print(san)
@@ -69,9 +65,16 @@ class Api():
         fen = self.board.fen()
         print(fen)
         board = chess.Board(fen)
+
+        if not self.uci_engine or not os.path.exists(self.uci_engine) or not os.access(self.uci_engine, os.X_OK):
+            error_message = f"UCI engine path is invalid or not executable: {self.uci_engine}. Please register a valid engine."
+            print(error_message)
+            self.window.evaluate_js(f'alert("{error_message}");')
+            return None
+
         if not self.engine:
+            # self.uci_engine is a string path (see load_settings / register_uci_engine)
             self.engine = chess.engine.SimpleEngine.popen_uci(self.uci_engine)
-        # result = self.engine.play(board, chess.engine.Limit(self.depth))
         try:
             result = self.engine.play(board, chess.engine.Limit(self.depth))
             san = board.san(result.move)
@@ -98,10 +101,19 @@ class Api():
     def open_pgn_dialog(self):
         self.on_closed()
         file_types = ('PGN File (*.pgn)', 'All files (*.*)')
-        file_path = self.window.create_file_dialog(webview.OPEN_DIALOG, file_types=file_types)[0]
+        result = self.window.create_file_dialog(webview.FileDialog.OPEN, file_types=file_types)
+        # create_file_dialog may return None (if cancelled) or an empty list; guard it
+        if not result:
+            return None
+        file_path = result[0]
+        if not file_path:
+            return None
 
         if os.path.exists(file_path):
-            self.pgn = open(file_path)
+            # Do NOT store an open file object on the Api instance (pywebview will try to inspect it).
+            # Store the path (string) and let load_games_from_file open/close the file when needed.
+            self.pgn = file_path
+
             prev_games = self.games[:]  # Save the previous state of self.games
             self.games = []  # Initialize games here to clear previous games
             self.load_games_from_file()
@@ -120,15 +132,21 @@ class Api():
 
     def save_pgn_dialog(self):
         self.on_closed()
-        # file_path = self.window.create_file_dialog(webview.SAVE_DIALOG)[0]
         file_types = ('PGN File (*.pgn)', 'All files (*.*)')
-        file_path = self.window.create_file_dialog(webview.SAVE_DIALOG, file_types=file_types)[0]
+        result = self.window.create_file_dialog(webview.FileDialog.SAVE, file_types=file_types)
+        if not result:
+            return None
+        file_path = result[0]
+        if not file_path:
+            return None
         dir_path = os.path.dirname(file_path)
         pgn = self.board_to_game(self.board)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path, exist_ok=True)
         with open(file_path, 'a') as f:
-            f.write('\n\n')  # Add blank line to separate new games
+            f.write('''
+
+''')  # Add blank line to separate new games
             f.write(pgn)
 
     def board_to_game(self, board):
@@ -156,11 +174,22 @@ class Api():
         return str(game)
 
     def load_games_from_file(self):
-        while True:
-            game = chess.pgn.read_game(self.pgn)
-            if game is None:
-                break
-            self.games.append(game)
+        # load from path stored in self.pgn (string). Do not rely on self.pgn being an open file object.
+        if not self.pgn:
+            return
+
+        # Ensure it's a path string
+        file_path = self.pgn
+        try:
+            with open(file_path, 'r') as pgn_file:
+                while True:
+                    game = chess.pgn.read_game(pgn_file)
+                    if game is None:
+                        break
+                    self.games.append(game)
+        except Exception as e:
+            # On error, leave self.games empty (caller will revert if needed)
+            print(f"Failed to load PGN file {file_path}: {e}")
 
     def load_current_game_fen(self):
         if 0 <= self.current_game_index < len(self.games):
@@ -200,28 +229,45 @@ class Api():
         return len(self.board.move_stack) < len(self.stack)
 
     def register_uci_engine(self):
-        file_path = self.window.create_file_dialog(webview.OPEN_DIALOG)[0]
-        print(file_path)
-        if os.path.exists(file_path):
+        result = self.window.create_file_dialog(webview.FileDialog.OPEN)
+        if not result:
+            return None
+        file_path = result[0]
+        if file_path and os.path.exists(file_path):
+            # store as string path
             self.uci_engine = file_path
+            # Save the selected engine path to settings
+            self.save_settings({'uci_engine': file_path})
+            return file_path # Return the path to the frontend
+        return None # Return None if no valid file was selected or it doesn't exist
 
     def load_settings(self):
         # Get configuration file path to user folder
         if os.name == 'posix':
-            self.config_path = Path(Path.home(), '.cache/py-chessboardjs/settings.ini')
-            # self.config_path = Path.home() / '.cache/py-chessboardjs/settings.ini'
+            cfg_path = Path(Path.home(), '.cache/py-chessboardjs/settings.ini')
         elif os.name == 'nt':
-            self.config_path = Path(Path.home(), 'py-chessboardjs', 'settings.ini')
+            cfg_path = Path(Path.home(), 'py-chessboardjs', 'settings.ini')
         else:
-            self.config_path = Path('py-chessboardjs', 'settings.ini')
+            cfg_path = Path('py-chessboardjs', 'settings.ini')
 
-        if self.config_path.exists():
+        # Keep a string path for exposing to pywebview
+        self.config_path = str(cfg_path)
+
+        if cfg_path.exists():
             config = configparser.ConfigParser()
             config.read(self.config_path)
-            self.uci_engine = config['Settings']['uci_engine']
-            self.depth = int(config['Settings']['depth'])
-            self.population = int(config['Settings']['population'])
-            self.generation = int(config['Settings']['generation'])
+            # Protect against missing keys with defaults
+            try:
+                self.uci_engine = config['Settings']['uci_engine']
+                self.depth = int(config['Settings'].get('depth', '20'))
+                self.population = int(config['Settings'].get('population', '500'))
+                self.generation = int(config['Settings'].get('generation', '15'))
+            except Exception:
+                # Fallback defaults if config malformed
+                self.uci_engine = '/usr/games/stockfish'
+                self.depth = 20
+                self.population = 500
+                self.generation = 15
         else:
             # Default value if configuration file does not exist
             self.uci_engine = '/usr/games/stockfish'
@@ -230,8 +276,7 @@ class Api():
             self.generation = 15
 
             # Create the configuration file if it does not exist
-            self.config_path.parents[0].mkdir(parents=True, exist_ok=True)
-            self.config_path.touch()
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             config = configparser.ConfigParser()
             config['Settings'] = {
                 'uci_engine': str(self.uci_engine),
@@ -242,11 +287,11 @@ class Api():
             with open(self.config_path, 'w') as configfile:
                 config.write(configfile)
 
-
     def save_settings(self, settings):
         config = configparser.ConfigParser()
 
         # Load configuration file
+        # self.config_path is a string path
         config.read(self.config_path)
 
         # Create 'Settings' section and add settings
