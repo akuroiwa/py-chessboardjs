@@ -3,34 +3,40 @@ name: Publish Python Package to PyPI
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
 
 jobs:
-  build-and-publish:
+  publish:
+    name: Build and publish Python package
     runs-on: ubuntu-latest
+    # Specifies that the job needs a write token to the id-token.
+    # This is required for trusted publishing.
     permissions:
-      id-token: write # IMPORTANT: this permission is needed for trusted publishing
+      id-token: write
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
-    - name: Build package
-      run: python -m build
-    - name: Publish to TestPyPI (if tag contains 'test')
-      if: contains(github.ref, 'test')
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        # No password needed for Trusted Publishing
-    - name: Publish to PyPI (if tag does not contain 'test')
-      if: !contains(github.ref, 'test')
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        # No password needed for Trusted Publishing
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install build dependencies
+        run: python -m pip install --upgrade build
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish package to TestPyPI
+        if: contains(github.ref_name, '-test')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # Trusted publishing is used by default, no token needed.
+          # You must configure TestPyPI to trust this workflow.
+
+      - name: Publish package to PyPI
+        if: "!contains(github.ref_name, '-test')"
+        uses: pypa/gh-action-pypi-publish@release/v1
